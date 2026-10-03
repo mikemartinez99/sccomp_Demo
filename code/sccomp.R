@@ -121,3 +121,42 @@ p <- ggplot(sccomp_flat, aes(x = c_effect, y = reorder(celltype.mapped, c_effect
             theme(legend.position = "bottom",
                     panel.grid.minor = element_blank())
 ggsave(paste0(figDir, "sccomp_output.png"), width = 8, height = 8)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+# CELL TYPE COMPOSITION BARPLOT
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+#----- Specify the blood lineages
+tal1Types <- c("Haematoendothelial progenitors",
+               "Blood progenitors 1", "Blood progenitors 2",
+               "Erythroid1", "Erythroid2", "Erythroid3")
+
+#----- Proportion of each cell type per sample
+composition <- seurat@meta.data |>
+    mutate(status = ifelse(tomato == "TRUE", "Tal1-/- (tdTomato+)", "WT (tdTomato-)"),
+           status = factor(status, levels = c("WT (tdTomato-)", "Tal1-/- (tdTomato+)")),
+           celltype = ifelse(celltype.mapped %in% tal1Types, as.character(celltype.mapped), "Other"),
+           celltype = factor(celltype, levels = c("Other", tal1Types))) |>
+    dplyr::count(status, sample, celltype) |>
+    group_by(sample) |>
+    mutate(proportion = n / sum(n)) |>
+    ungroup()
+
+#----- dittoColors for the Tal1 lineage, grey for Other
+celltypeColors <- c("Other" = "grey85",
+                    setNames(dittoColors()[seq_along(tal1Types)], tal1Types))
+
+p_comp <- ggplot(composition, aes(x = sample, y = proportion, fill = celltype)) +
+            geom_col(width = 0.8, colour = "white", linewidth = 0.1) +
+            facet_grid(~ status, scales = "free_x", space = "free_x") +
+            scale_fill_manual(values = celltypeColors, name = NULL, drop = FALSE) +
+            scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
+            labs(x = "Sample", y = "Proportion of cells") +
+            theme_classic(base_size = 12) +
+            theme(legend.position = "right",
+                  legend.key.size = unit(0.4, "cm"),
+                  strip.background = element_blank(),
+                  strip.text = element_text(face = "bold")) +
+            guides(fill = guide_legend(ncol = 1, reverse = TRUE))
+ggsave(paste0(figDir, "celltype_composition.png"), p_comp, width = 7, height = 6)
+
